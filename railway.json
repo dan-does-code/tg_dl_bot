@@ -1,0 +1,23 @@
+{
+  "name": "telegram-video-downloader",
+  "description": "Telegram bot for downloading YouTube videos with intelligent caching",
+  "keywords": ["telegram", "bot", "youtube", "downloader", "caching"],
+  "env": {
+    "TELEGRAM_BOT_TOKEN": {
+      "description": "Telegram Bot Token from @BotFather",
+      "required": true
+    }
+  },
+  "build": {
+    "commands": [
+      "pip install -r requirements.txt"
+    ]
+  },
+  "start": {
+    "cmd": "python bot.py"
+  },
+  "healthcheck": {
+    "path": "/health",
+    "timeout": 30
+  }
+}
