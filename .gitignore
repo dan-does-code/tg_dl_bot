@@ -80,6 +80,11 @@ Thumbs.db
 .clinerules/
 .roomodes
 
+# Claude Code and BMad-Method working directories
+docs/
+web-bundles/
+.github/chatmodes/
+
 # Windows batch files
 *.bat
 
