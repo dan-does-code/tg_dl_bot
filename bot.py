@@ -66,8 +66,9 @@ class TelegramVideoBot:
             "• YouTube (youtube.com, youtu.be)\n"
             "• More platforms coming soon!\n\n"
             "💡 **Tips:**\n"
-            "• Videos are limited to 720p for faster downloads\n"
-            "• Large files may take a few minutes to process"
+            "• You can configure quality and file size preferences in /settings\n"
+            "• Large files may take a few minutes to process\n"
+            "• Use Quick Mode for automatic downloads based on your preferences"
         )
         await update.message.reply_text(help_message, parse_mode='Markdown')
         
@@ -212,7 +213,9 @@ class TelegramVideoBot:
                     fmt = video_formats[j]
                     quality = fmt['quality']
                     file_size = f" ({fmt['filesize_mb']}MB)" if fmt['filesize_mb'] > 0 else ""
-                    button_text = f"🎥 {quality}{file_size}"
+                    # Indicate if video-only (yt-dlp will auto-combine with audio)
+                    audio_indicator = "" if fmt.get('has_audio', False) else " + Audio"
+                    button_text = f"🎥 {quality}{file_size}{audio_indicator}"
                     callback_data = f"video:{url}:{fmt['format_id']}"
                     row.append(InlineKeyboardButton(button_text, callback_data=callback_data))
                 keyboard.append(row)
@@ -560,7 +563,7 @@ class TelegramVideoBot:
     
     async def show_size_selection(self, query, size_type):
         """Show file size selection interface for min/max size settings"""
-        size_options = [1, 5, 10, 20, 30, 50]  # MB options
+        size_options = [5, 15, 50, 100, 250, 500]  # IMPROVED: Better size brackets in MB
         
         keyboard = []
         
@@ -572,6 +575,11 @@ class TelegramVideoBot:
                 callback_data = f"size_set:{size_type}:{size_mb}"
                 row.append(InlineKeyboardButton(f"📊 {size_mb}MB", callback_data=callback_data))
             keyboard.append(row)
+        
+        # Add manual input option (future enhancement)
+        keyboard.append([
+            InlineKeyboardButton("✏️ Manual Input (Coming Soon)", callback_data=f"size_set:{size_type}:manual_disabled")
+        ])
         
         # Add clear option and back button
         keyboard.append([
@@ -679,6 +687,17 @@ class TelegramVideoBot:
             return
             
         size_type, value = parts
+        
+        # Handle manual input disabled (future feature)
+        if value == "manual_disabled":
+            await query.edit_message_text(
+                "✏️ **Manual Input Feature**\n\n"
+                "This feature is planned for a future update! For now, please select from the available options.\n\n"
+                "⏰ Coming soon: Type any size value manually!"
+            )
+            await asyncio.sleep(2)
+            await self.show_size_selection(query, size_type)
+            return
         
         # Update setting with validation
         if value == "clear":

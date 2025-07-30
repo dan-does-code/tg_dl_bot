@@ -102,13 +102,14 @@ class VideoDownloader:
     def _process_formats(self, raw_formats, duration):
         """
         Process raw yt-dlp format data into structured format information.
+        FIXED: Handle modern YouTube's separated video/audio streams properly.
         """
         video_formats = []
         audio_formats = []
         
-        # Group formats by type and quality
-        seen_video_qualities = set()
-        seen_audio_qualities = set()
+        # Track format IDs to avoid TRUE duplicates only
+        seen_video_format_ids = set()
+        seen_audio_format_ids = set()
         
         for fmt in raw_formats:
             try:
@@ -116,12 +117,17 @@ class VideoDownloader:
                 ext = fmt.get('ext', 'unknown')
                 filesize = fmt.get('filesize') or fmt.get('filesize_approx', 0)
                 
+                # Skip if we've already processed this exact format
+                if format_id in seen_video_format_ids or format_id in seen_audio_format_ids:
+                    continue
+                
                 # Determine if this is video or audio-only
                 vcodec = fmt.get('vcodec', 'none')
                 acodec = fmt.get('acodec', 'none')
                 
-                if vcodec != 'none' and acodec != 'none':
-                    # Video format with audio
+                # FIXED: Handle both combined and separated video/audio streams
+                if vcodec != 'none':
+                    # This is a video format (may or may not have audio)
                     height = fmt.get('height')
                     width = fmt.get('width')
                     fps = fmt.get('fps', 30)
@@ -129,12 +135,8 @@ class VideoDownloader:
                     if height:
                         quality = f"{height}p"
                         
-                        # Skip if we already have this quality (prefer mp4 over webm)
-                        quality_key = (quality, ext)
-                        if quality in seen_video_qualities and ext != 'mp4':
-                            continue
-                            
-                        seen_video_qualities.add(quality)
+                        # Only track format IDs to avoid true duplicates
+                        seen_video_format_ids.add(format_id)
                         
                         # Estimate file size if not available
                         if not filesize and duration:
@@ -149,43 +151,58 @@ class VideoDownloader:
                             'filesize_mb': round(filesize / (1024 * 1024), 1) if filesize else 0,
                             'fps': fps,
                             'vcodec': vcodec,
+                            'acodec': acodec,  # May be 'none' for video-only streams
                             'width': width,
-                            'height': height
+                            'height': height,
+                            'has_audio': acodec != 'none'
                         })
                         
                 elif acodec != 'none' and vcodec == 'none':
-                    # Audio-only format
+                    # This is an audio-only format
                     abr = fmt.get('abr', 128)  # Audio bitrate
-                    quality_key = f"audio_{abr}k"
                     
-                    if quality_key not in seen_audio_qualities:
-                        seen_audio_qualities.add(quality_key)
-                        
-                        # Estimate audio file size if not available
-                        if not filesize and duration and abr:
-                            filesize = (abr * 1000 * duration) // 8  # Convert kbps to bytes
-                        
-                        audio_formats.append({
-                            'quality': 'audio_only',
-                            'format_id': format_id,
-                            'ext': ext,
-                            'filesize_mb': round(filesize / (1024 * 1024), 1) if filesize else 0,
-                            'abr': abr,
-                            'acodec': acodec
-                        })
+                    # Only track format IDs, not arbitrary quality keys
+                    seen_audio_format_ids.add(format_id)
+                    
+                    # Estimate audio file size if not available
+                    if not filesize and duration and abr:
+                        filesize = (abr * 1000 * duration) // 8  # Convert kbps to bytes
+                    
+                    audio_formats.append({
+                        'quality': 'audio_only',
+                        'format_id': format_id,
+                        'ext': ext,
+                        'filesize_mb': round(filesize / (1024 * 1024), 1) if filesize else 0,
+                        'abr': abr,
+                        'acodec': acodec
+                    })
                         
             except Exception as e:
                 logging.warning(f"Error processing format {fmt.get('format_id', 'unknown')}: {e}")
                 continue
         
-        # Sort video formats by quality (highest first)
-        video_formats.sort(key=lambda x: self._quality_sort_key(x['quality']), reverse=True)
+        # Sort video formats by quality (highest first), then by preference
+        video_formats.sort(key=lambda x: (
+            self._quality_sort_key(x['quality']),  # Primary: quality
+            x.get('has_audio', False),              # Secondary: prefer formats with audio
+            x['ext'] == 'mp4',                     # Tertiary: prefer mp4
+            -x.get('filesize_mb', 0)               # Quaternary: prefer larger files (better quality)
+        ), reverse=True)
+        
+        # Deduplicate video formats - keep only the best format per quality
+        unique_video_formats = []
+        seen_qualities = set()
+        for fmt in video_formats:
+            quality = fmt['quality']
+            if quality not in seen_qualities:
+                seen_qualities.add(quality)
+                unique_video_formats.append(fmt)
         
         # Sort audio formats by bitrate (highest first)
         audio_formats.sort(key=lambda x: x.get('abr', 0), reverse=True)
         
         return {
-            'video': video_formats,
+            'video': unique_video_formats,  # Return deduplicated list
             'audio': audio_formats
         }
         
@@ -245,12 +262,12 @@ class VideoDownloader:
                         height = int(quality.replace('p', ''))
                         format_selector = f'best[height<={height}]'
                     except:
-                        format_selector = 'best[height<=720]'  # Default fallback
+                        format_selector = 'best'  # FIXED: Removed 720p limit
                 logging.info(f"Downloading video from {url} with quality: {quality}")
             else:
-                # Default format (backward compatibility)
-                format_selector = 'best[height<=720]'
-                logging.info(f"Downloading video from {url} with default quality")
+                # Default format (backward compatibility) - FIXED: Removed 720p limit
+                format_selector = 'best'
+                logging.info(f"Downloading video from {url} with best available quality")
             
             # Configure yt-dlp options
             ydl_opts = {
