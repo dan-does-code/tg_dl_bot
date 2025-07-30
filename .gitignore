@@ -51,6 +51,18 @@ venv.bak/
 temp/
 tmp/
 
+# Downloaded videos (test files)
+*.mp4
+*.webm
+*.mkv
+*.avi
+*.flv
+*.part
+
+# YouTube-dl bundled (using yt-dlp instead)
+youtube-dl-master/
+youtube-dl-master.zip
+
 # Logs
 *.log
 logs/
@@ -60,15 +72,15 @@ logs/
 Thumbs.db
 
 # Claude Code settings
-  .claude/
+.claude/
 
-  # Windows batch files
-  *.bat
+# Windows batch files
+*.bat
 
-  # Test files (optional - keep if Railway needs them)
-  test_*.py
+# Test files (optional - keep if Railway needs them)
+test_*.py
 
-  # Archives and temporary files
-  *.zip
-  BLOB.MD
-  ramble.md
+# Archives and temporary files
+*.zip
+BLOB.MD
+ramble.md

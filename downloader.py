@@ -4,15 +4,10 @@ import subprocess
 import tempfile
 import logging
 from pathlib import Path
+import yt_dlp
 
 class VideoDownloader:
     def __init__(self):
-        # Get the path to youtube-dl executable
-        self.youtube_dl_path = Path(__file__).parent / "youtube-dl-master" / "bin" / "youtube-dl"
-        if not self.youtube_dl_path.exists():
-            # Try alternative path
-            self.youtube_dl_path = Path(__file__).parent / "youtube-dl-master" / "youtube_dl" / "__main__.py"
-        
         self.temp_dir = tempfile.mkdtemp()
         
     def download_video(self, url):
@@ -24,23 +19,24 @@ class VideoDownloader:
             # Output filename template
             output_template = os.path.join(self.temp_dir, "%(title)s.%(ext)s")
             
-            # Run youtube-dl to download video
-            cmd = [
-                sys.executable, str(self.youtube_dl_path),
-                "--format", "best[height<=720]",  # Limit quality for Telegram compatibility
-                "--output", output_template,
-                "--no-playlist",
-                "--write-info-json",
-                url
-            ]
+            # Configure yt-dlp options
+            ydl_opts = {
+                'format': 'best[height<=720]',  # Limit quality for Telegram compatibility
+                'outtmpl': output_template,
+                'noplaylist': True,
+                'writeinfojson': True,
+            }
             
-            logging.info(f"Running youtube-dl command: {' '.join(cmd)}")
+            logging.info(f"Downloading video from: {url}")
             
-            result = subprocess.run(cmd, capture_output=True, text=True, timeout=300)
-            
-            if result.returncode != 0:
-                logging.error(f"youtube-dl failed: {result.stderr}")
-                return None
+            with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+                # Extract info first to get metadata
+                info = ydl.extract_info(url, download=False)
+                title = info.get('title', 'Unknown')
+                duration = info.get('duration')
+                
+                # Now download the video
+                ydl.download([url])
                 
             # Find downloaded files
             temp_files = list(Path(self.temp_dir).glob("*"))
@@ -50,33 +46,17 @@ class VideoDownloader:
             for file in temp_files:
                 if file.suffix in ['.mp4', '.webm', '.mkv', '.avi']:
                     video_file = file
-                elif file.suffix == '.info.json':
+                elif file.suffix == '.json':
                     info_file = file
                     
             if not video_file:
                 logging.error("No video file found after download")
                 return None
                 
-            # Extract metadata from info file if available
-            title = video_file.stem
-            duration = None
             file_size = video_file.stat().st_size
             
-            if info_file:
-                try:
-                    import json
-                    with open(info_file, 'r', encoding='utf-8') as f:
-                        info = json.load(f)
-                        title = info.get('title', title)
-                        duration = info.get('duration')
-                except Exception as e:
-                    logging.warning(f"Could not parse info file: {e}")
-                    
             return str(video_file), title, duration, file_size
             
-        except subprocess.TimeoutExpired:
-            logging.error("Download timed out")
-            return None
         except Exception as e:
             logging.error(f"Download failed: {e}")
             return None
