@@ -212,10 +212,10 @@ class TelegramVideoBot:
                 for j in range(i, min(i + 2, len(video_formats))):
                     fmt = video_formats[j]
                     quality = fmt['quality']
-                    file_size = f" ({fmt['filesize_mb']}MB)" if fmt['filesize_mb'] > 0 else ""
-                    # Indicate if video-only (yt-dlp will auto-combine with audio)
-                    audio_indicator = "" if fmt.get('has_audio', False) else " + Audio"
-                    button_text = f"🎥 {quality}{file_size}{audio_indicator}"
+                    # FIXED: Don't show file sizes in buttons - they were misleading (23x error rate)
+                    # Only show quality and audio indicator for clarity
+                    audio_indicator = " + Audio" if not fmt.get('has_audio', False) else ""
+                    button_text = f"🎥 {quality}{audio_indicator}"
                     callback_data = f"video:{url}:{fmt['format_id']}"
                     row.append(InlineKeyboardButton(button_text, callback_data=callback_data))
                 keyboard.append(row)
@@ -225,8 +225,8 @@ class TelegramVideoBot:
         if audio_formats:
             # Take the best audio format (first one, since they're sorted by quality)
             best_audio = audio_formats[0]
-            file_size = f" ({best_audio['filesize_mb']}MB)" if best_audio['filesize_mb'] > 0 else ""
-            button_text = f"🎵 Audio Only{file_size}"
+            # FIXED: Don't show misleading file sizes in audio buttons either
+            button_text = f"🎵 Audio Only"
             callback_data = f"audio:{url}:{best_audio['format_id']}"
             keyboard.append([InlineKeyboardButton(button_text, callback_data=callback_data)])
         
@@ -427,7 +427,8 @@ class TelegramVideoBot:
             
             # Check file size limit
             if file_size > 50 * 1024 * 1024:  # 50MB
-                await query.edit_message_text(f"❌ File too large ({file_size // 1024 // 1024}MB). Telegram limit is 50MB.")
+                await query.edit_message_text(f"❌ File too large ({file_size // 1024 // 1024}MB). "
+                                             f"Telegram bot limit is 50MB. Try a lower quality (720p or below).")
                 Path(file_path).unlink(missing_ok=True)
                 return
             

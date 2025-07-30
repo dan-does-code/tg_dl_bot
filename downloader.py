@@ -111,6 +111,9 @@ class VideoDownloader:
         seen_video_format_ids = set()
         seen_audio_format_ids = set()
         
+        # DEBUG: Log total formats and sample data to identify contamination issues
+        logging.debug(f"Processing {len(raw_formats)} total formats from yt-dlp")
+        
         for fmt in raw_formats:
             try:
                 format_id = fmt.get('format_id', '')
@@ -132,17 +135,25 @@ class VideoDownloader:
                     width = fmt.get('width')
                     fps = fmt.get('fps', 30)
                     
-                    if height:
+                    if height and height > 0:
+                        # FIXED: Add validation to ensure height is reasonable (not preview data)
+                        if not (240 <= height <= 4320):  # 240p to 8K range
+                            logging.warning(f"Suspicious height {height}p for format {format_id} - might be preview data")
+                            continue
+                            
                         quality = f"{height}p"
+                        
+                        # DEBUG: Log format details to identify data source issues
+                        logging.debug(f"Video format {format_id}: {quality}, size={filesize}, "
+                                    f"vcodec={vcodec}, acodec={acodec}, ext={ext}")
                         
                         # Only track format IDs to avoid true duplicates
                         seen_video_format_ids.add(format_id)
                         
-                        # Estimate file size if not available
-                        if not filesize and duration:
-                            # Rough estimation based on quality
-                            bitrate_estimate = self._estimate_bitrate(height)
-                            filesize = (bitrate_estimate * duration) // 8  # Convert to bytes
+                        # FIXED: Don't estimate file sizes - they were wildly inaccurate (23x error rate)
+                        # Only use actual file sizes from yt-dlp or set to 0 to avoid misleading users
+                        if not filesize:
+                            filesize = 0  # Don't show misleading estimates
                         
                         video_formats.append({
                             'quality': quality,
@@ -164,9 +175,9 @@ class VideoDownloader:
                     # Only track format IDs, not arbitrary quality keys
                     seen_audio_format_ids.add(format_id)
                     
-                    # Estimate audio file size if not available
-                    if not filesize and duration and abr:
-                        filesize = (abr * 1000 * duration) // 8  # Convert kbps to bytes
+                    # FIXED: Don't estimate audio file sizes either - use actual values only
+                    if not filesize:
+                        filesize = 0  # Don't show misleading estimates
                     
                     audio_formats.append({
                         'quality': 'audio_only',
