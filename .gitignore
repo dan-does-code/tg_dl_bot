@@ -71,8 +71,14 @@ logs/
 .DS_Store
 Thumbs.db
 
-# Claude Code settings
+# AI Assistant directories
 .claude/
+.gemini/
+.trae/
+.windsurf/
+.bmad-core/
+.clinerules/
+.roomodes
 
 # Windows batch files
 *.bat

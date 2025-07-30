@@ -2,7 +2,17 @@
   "permissions": {
     "allow": [
       "Bash(mkdir:*)",
-      "Bash(python test:*)"
+      "Bash(python test:*)",
+      "Bash(powershell:*)",
+      "Bash(python:*)",
+      "Bash(pip install:*)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(rmdir:*)",
+      "Bash(del youtube-dl-master.zip)",
+      "Bash(del BLOB.MD ramble.md youtube-dl-usage.md start_bot.bat start_bot.sh test_bot.py)",
+      "Bash(del:*)",
+      "Bash(find:*)"
     ],
     "deny": []
   }
