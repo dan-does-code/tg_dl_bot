@@ -84,6 +84,7 @@ Thumbs.db
 docs/
 web-bundles/
 .github/chatmodes/
+CLAUDE.md
 
 # Windows batch files
 *.bat
